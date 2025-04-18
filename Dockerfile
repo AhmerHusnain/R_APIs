@@ -1,25 +1,16 @@
-# Base image with R and plumber
-FROM rocker/r-ver:4.2.0
+FROM rocker/verse:4.2.0
+RUN apt-get update && apt-get install -y  git-core libcurl4-openssl-dev libgit2-dev libicu-dev libsodium-dev libssl-dev libxml2-dev make pandoc pandoc-citeproc zlib1g-dev && rm -rf /var/lib/apt/lists/*
+RUN echo "options(repos = c(CRAN = 'https://cran.rstudio.com/'), download.file.method = 'libcurl', Ncpus = 4)" >> /usr/local/lib/R/etc/Rprofile.site
 
-# Install necessary system dependencies
-RUN apt-get update && apt-get install -y \
-  libcurl4-openssl-dev \
-  libssl-dev \
-  libxml2-dev \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
+# install the randomForest package
+RUN R -e 'install.packages("remotes")'
+RUN Rscript -e 'remotes::install_version("tidyverse",upgrade="never", version = "1.3.2")'
+RUN Rscript -e 'remotes::install_version("plumber",upgrade="never", version = "1.2.0")'
 
-# Install R packages
-RUN R -e "install.packages(c('plumber', 'httr', 'jsonlite'), repos='http://cran.rstudio.com/')"
+RUN mkdir /build_zone
+ADD . /build_zone
+WORKDIR /build_zone
 
-# Copy the Plumber API file into the container
-COPY plumber.R /app/plumber.R
-
-# Expose the port the Plumber API will run on
 EXPOSE 8000
 
-# Set the working directory
-WORKDIR /app
-
-# Define the command to run the API
-CMD ["R", "-e", "pr <- plumber::plumb('plumber.R'); pr$run(host = '0.0.0.0', port = 8000)"]
+ENTRYPOINT ["R", "-e", "library(plumber); library(tidyverse); library(readxl); plumb('plumber.R')$run(port=8000, host='0.0.0.0')"]
